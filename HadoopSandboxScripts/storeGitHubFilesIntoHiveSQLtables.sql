@@ -1,6 +1,6 @@
 --create table and import data
 --ratings
-CREATE EXTERNAL IF NOT EXISTS TABLE ratings (
+CREATE EXTERNAL TABLE IF NOT EXISTS ratings (
 userId BIGINT, 
 movieId BIGINT, 
 rating DECIMAL,

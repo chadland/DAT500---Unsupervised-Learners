@@ -7,12 +7,13 @@ wget  -O /usr/ratings.csv "https://raw.githubusercontent.com/chadland/DAT500---U
 wget  -O /usr/movies.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/movies.csv"
 wget  -O /usr/links.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/links.csv"
 wget  -O /usr/tags.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/tags.csv"
+wget -O /usr/storeGitHubFilesIntoHiveSQLtables.sql  "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/HadoopSandboxScripts/storeGitHubFilesIntoHiveSQLtables.sql"
 
 #copy to hive file system from downloaded path
 hadoop fs -put -f /usr/*.csv /user/hive
 
 #start hive
-hive 
+hive -f /usr/storeGitHubFilesIntoHiveSQLtables.sql
 
 #create table and import data
 #ratings
