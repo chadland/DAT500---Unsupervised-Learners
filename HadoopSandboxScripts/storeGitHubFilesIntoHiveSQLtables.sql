@@ -1,21 +1,5 @@
-#!/bin/bash
-
-echo "DAT500 Unsupervised Learners Project Script: Load MovieLens data Into Hive from GitHub"
-
-#copy files from github to hive drive, this is the little data set just to test 
-wget  -O /usr/ratings.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/ratings.csv"
-wget  -O /usr/movies.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/movies.csv"
-wget  -O /usr/links.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/links.csv"
-wget  -O /usr/tags.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/tags.csv"
-
-#copy to hive file system from downloaded path
-hadoop fs -put -f /usr/*.csv /user/hive
-
-#start hive
-hive 
-
-#create table and import data
-#ratings
+--create table and import data
+--ratings
 CREATE EXTERNAL TABLE ratings (
 userId BIGINT, 
 movieId BIGINT, 
@@ -28,7 +12,7 @@ STORED AS TEXTFILE;
 
 LOAD DATA INPATH '/user/hive/ratings.csv' OVERWRITE INTO TABLE ratings;
 
-#movies
+--movies
 CREATE EXTERNAL TABLE movies (
 movieId BIGINT,
 title STRING,
@@ -40,7 +24,7 @@ STORED AS TEXTFILE;
 
 LOAD DATA INPATH '/user/hive/movies.csv' OVERWRITE INTO TABLE movies;
 
-#tags
+--tags
 CREATE EXTERNAL TABLE tags (
 userId BIGINT,
 movieId BIGINT,
@@ -53,7 +37,7 @@ STORED AS TEXTFILE;
 
 LOAD DATA INPATH '/user/hive/tags.csv' OVERWRITE INTO TABLE tags;
 
-#links
+--links
 CREATE EXTERNAL TABLE links (
 movieId BIGINT,
 imdbId BIGINT,
@@ -65,7 +49,7 @@ STORED AS TEXTFILE;
 
 LOAD DATA INPATH '/user/hive/links.csv' OVERWRITE INTO TABLE links;
 
-#Run a simple query, count ratings pr. user and list top 10 results
+--Run a simple query, count ratings pr. user and list top 10 results
 Select 
 userId, 
 COUNT(movieId) as moviesRated FROM 
