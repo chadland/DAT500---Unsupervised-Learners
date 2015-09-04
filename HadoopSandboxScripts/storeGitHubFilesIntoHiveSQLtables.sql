@@ -1,6 +1,6 @@
 --create table and import data
 --ratings
-CREATE EXTERNAL TABLE ratings (
+CREATE EXTERNAL IF NOT EXISTS TABLE ratings (
 userId BIGINT, 
 movieId BIGINT, 
 rating DECIMAL,
@@ -13,7 +13,7 @@ STORED AS TEXTFILE;
 LOAD DATA INPATH '/user/hive/ratings.csv' OVERWRITE INTO TABLE ratings;
 
 --movies
-CREATE EXTERNAL TABLE movies (
+CREATE EXTERNAL TABLE IF NOT EXISTS movies (
 movieId BIGINT,
 title STRING,
 genres STRING)
@@ -25,7 +25,7 @@ STORED AS TEXTFILE;
 LOAD DATA INPATH '/user/hive/movies.csv' OVERWRITE INTO TABLE movies;
 
 --tags
-CREATE EXTERNAL TABLE tags (
+CREATE EXTERNAL TABLE IF NOT EXISTS tags (
 userId BIGINT,
 movieId BIGINT,
 tag STRING,
@@ -38,7 +38,7 @@ STORED AS TEXTFILE;
 LOAD DATA INPATH '/user/hive/tags.csv' OVERWRITE INTO TABLE tags;
 
 --links
-CREATE EXTERNAL TABLE links (
+CREATE EXTERNAL TABLE IF NOT EXISTS links (
 movieId BIGINT,
 imdbId BIGINT,
 tmdbId BIGINT)
