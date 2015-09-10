@@ -9,6 +9,7 @@ wget  -O /usr/links.csv "https://raw.githubusercontent.com/chadland/DAT500---Uns
 wget  -O /usr/tags.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/tags.csv"
 wget -O /usr/storeGitHubFilesIntoHiveSQLtables.sql  "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/HadoopSandboxScripts/storeGitHubFilesIntoHiveSQLtables.sql"
 wget -O /usr/FindTop10UsersThatHaveMadeMostRatings.sql  "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/HadoopSandboxScripts/FindTop10UsersThatHaveMadeMostRatings.sql"
+wget -O /usr/FindTop10WorstRatedMovies.sql  "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/HadoopSandboxScripts/FindTop10WorstRatedMovies.sql"
 
 #copy to hive file system from downloaded path
 hadoop fs -put -f /usr/*.csv /user/hive
@@ -17,3 +18,9 @@ hive -f /usr/storeGitHubFilesIntoHiveSQLtables.sql
 #find top 10 users that have rated the most and store results in destination tables and create CSV
 hive -f /usr/FindTop10UsersThatHaveMadeMostRatings.sql
 hive -e 'select * from TOPUSERS' | sed 's/[[:space:]]\+/,/g' > /usr/TOPUSERS.csv
+
+#find top 10 movies with worst ratings
+hive -f /usr/FindTop10WorstRatedMovies.sql
+hive -e 'select * from WORSTRATINGS' | sed 's/[[:space:]]\+/,/g' > /usr/WORSTRATINGS.csv
+
+
