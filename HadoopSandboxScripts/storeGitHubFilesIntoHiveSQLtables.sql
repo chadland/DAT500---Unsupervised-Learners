@@ -49,11 +49,5 @@ STORED AS TEXTFILE;
 
 LOAD DATA INPATH '/user/hive/links.csv' OVERWRITE INTO TABLE links;
 
---Run a simple query, count ratings pr. user and list top 10 results
-Select 
-userId, 
-COUNT(movieId) as moviesRated FROM 
-ratings 
-GROUP BY userId ORDER BY moviesRated desc limit 10;
 
 

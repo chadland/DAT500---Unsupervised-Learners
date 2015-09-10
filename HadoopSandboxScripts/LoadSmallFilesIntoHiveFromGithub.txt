@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "DAT500 Unsupervised Learners Project Script: Load MovieLens data Into Hive from GitHub"
+echo "DAT500 Unsupervised Learners Project Script: Load MovieLens data Into Hive from GitHub and run SQLs"
 
 #copy files from github to hive drive, this is the little data set just to test 
 wget  -O /usr/ratings.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/ratings.csv"
@@ -8,9 +8,12 @@ wget  -O /usr/movies.csv "https://raw.githubusercontent.com/chadland/DAT500---Un
 wget  -O /usr/links.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/links.csv"
 wget  -O /usr/tags.csv "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/MovieLensSmall/tags.csv"
 wget -O /usr/storeGitHubFilesIntoHiveSQLtables.sql  "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/HadoopSandboxScripts/storeGitHubFilesIntoHiveSQLtables.sql"
+wget -O /usr/FindTop10UsersThatHaveMadeMostRatings.sql  "https://raw.githubusercontent.com/chadland/DAT500---Unsupervised-Learners/master/HadoopSandboxScripts/FindTop10UsersThatHaveMadeMostRatings.sql"
 
 #copy to hive file system from downloaded path
 hadoop fs -put -f /usr/*.csv /user/hive
-
-#start hive
 hive -f /usr/storeGitHubFilesIntoHiveSQLtables.sql
+
+#find top 10 users that have rated the most and store results in destination tables and create CSV
+hive -f /usr/FindTop10UsersThatHaveMadeMostRatings.sql
+hive -e 'select * from TOPUSERS' | sed 's/[[:space:]]\+/,/g' > /usr/TOPUSERS.csv
