@@ -1,10 +1,12 @@
 --create table and import data
 --ratings
+DROP TABLE IF EXISTS ratings;
+
 CREATE EXTERNAL TABLE IF NOT EXISTS ratings (
 userId BIGINT, 
 movieId BIGINT, 
 rating DOUBLE,
-`timestamp` FLOAT)
+`timestamp` BIGINT)
 ROW FORMAT DELIMITED 
 FIELDS TERMINATED BY ',' 
 LINES TERMINATED BY '\n'
@@ -13,9 +15,9 @@ STORED AS TEXTFILE;
 LOAD DATA INPATH '/user/hive/ratings.csv' OVERWRITE INTO TABLE ratings;
 
 --create new date features in a new rating table derived from ratings
-DROP TABLE IF EXISTS ratingsTimestamp;
+DROP TABLE IF EXISTS ratingsTimestamp2;
 
-CREATE TABLE ratingsTimestamp AS
+CREATE TABLE ratingsTimestamp2 AS
 SELECT 
 *, 
 from_unixtime(`timestamp`) as new_timestamp,
