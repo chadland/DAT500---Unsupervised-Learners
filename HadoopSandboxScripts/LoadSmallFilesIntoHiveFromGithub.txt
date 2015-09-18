@@ -23,4 +23,6 @@ hive -e 'select * from TOPUSERS' | sed 's/[[:space:]]\+/,/g' > /usr/TOPUSERS.csv
 hive -f /usr/FindTop10WorstRatedMovies.sql
 hive -e 'select * from WORSTRATINGS' | sed 's/[[:space:]]\+/,/g' > /usr/WORSTRATINGS.csv
 
-
+#find the rating distribution
+hive -f /usr/ratingDistribution.sql
+hive -e 'select * from RATINGDISTRIBUTION' | sed 's/[[:space:]]\+/,/g' > /usr/RATINGDISTRIBUTION.csv
