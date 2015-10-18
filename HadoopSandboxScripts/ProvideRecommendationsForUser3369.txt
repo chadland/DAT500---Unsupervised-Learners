@@ -1,0 +1,53 @@
+/*Step 1, 
+Select active user and the max rated movie  */
+
+SELECT TOP 3
+a.*
+INTO #UserMaxRatedMovies 
+FROM 
+[DB_Marked].[dbo].[ratings] a
+INNER JOIN 
+(SELECT 
+UserId,
+MAX(Rating) MaxRating ,
+Avg(Rating) AvgRating
+FROM 
+[DB_Marked].[dbo].[ratings]
+GROUP BY
+UserID) b
+ON 
+a.UserId = b.Userid AND
+a.Rating = b.MaxRating 
+WHERE a.userId=3369
+ORDER BY a.timestamp DESC
+
+/*Step2 select movies to compare
+Selected 3 movies withe everyone else*/
+SELECT DISTINCT TOP 500000
+a.* ,
+NEWID() AS NewId
+INTO [DB_Marked].[dbo].[User3369]
+FROM
+[DB_Marked].[dbo].[ratings] a
+INNER JOIN 
+[DB_Marked].[dbo].[ratings] b
+ON 
+a.userId=b.userId
+INNER JOIN 
+#UserMaxRatedMovies c
+ON
+b.movieId = c.movieId
+LEFT JOIN 
+(SELECT *
+FROM 
+[DB_Marked].[dbo].[ratings]
+WHERE userid=3369 AND
+movieId NOT in (SELECT movieId FROM #UserMaxRatedMovies)  ) d
+ON 
+a.movieId = d.movieId
+WHERE d.movieID IS NULL 
+ORDER BY NEWID()
+
+
+/*Run Python script with Step 2, and provide recommendations*/
+  

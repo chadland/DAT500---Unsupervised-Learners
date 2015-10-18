@@ -1,0 +1,189 @@
+/****** Script for SelectTopNRows command from SSMS  ******/
+DROP TABLE #001RatingsAddedTimeStamp
+DROP TABLE #002HoldOutSample
+DROP TABLE #003MainSample
+DROP TABLE #004SecondLastRatedMovies
+DROP TABLE #005UniqueMovies
+
+/*Step1 Convert Time Stamp*/
+SELECT 
+[userId],
+[movieId],
+[rating],
+dateadd(S, [timestamp], '1970-01-01') AS DateRated
+INTO #001RatingsAddedTimeStamp
+FROM [DB_Marked].[dbo].[ratings]
+
+/*Step2 Create hold out sample of ratings to compare with recommendations
+Random sample of 2000 ratings*/
+SELECT TOP 2000
+a.userId,
+a.movieId,
+a.rating,
+a.DateRated
+INTO #002HoldOutSample
+FROM #001RatingsAddedTimeStamp a
+INNER JOIN
+(SELECT
+userId,
+MAX(DateRated) AS MaxDateRated,
+COUNT(rating) AS NrOfRatings,
+RAND(CAST(CAST(NEWID() AS VARBINARY) AS INT)) AS Rnd
+FROM #001RatingsAddedTimeStamp
+GROUP BY
+userId) b
+ON a.userId=b.userID
+AND 
+a.DateRated=b.MaxDateRated
+WHERE 
+b.NrOfRatings >1 
+ORDER BY
+b.Rnd 
+
+/*Step3 Create main sample 
+excluding the hold-out sample*/
+SELECT a.*
+INTO #003MainSample
+FROM #001RatingsAddedTimeStamp a
+LEFT JOIN
+#002HoldOutSample b
+ON 
+a.userId=b.userId AND
+a.MovieId=b.MovieId AND
+a.Rating = b.Rating AND
+a.DateRated=b.DateRated
+WHERE 
+b.UserId IS NULL
+
+/*Step 4 Find second last rated movies for the users/ratings that were held out
+from the hold-out sample to provide basis for recoomendations*/
+SELECT 
+c.userId,
+c.movieId,
+c.rating,
+c.DateRated
+INTO #004SecondLastRatedMovies
+FROM #001RatingsAddedTimeStamp c
+INNER JOIN
+(SELECT 
+a.userId,
+MAX(a.DateRated) AS MaxDateRated
+FROM
+#001RatingsAddedTimeStamp a
+LEFT JOIN
+#002HoldOutSample b
+ON
+a.UserId=b.UserId 
+WHERE  a.DateRated < b.DateRated 
+GROUP BY
+a.userId) d
+ON
+c.UserId=d.UserId AND
+c.DateRated = d.MaxDateRated
+ORDER 
+BY
+c.userid,
+c.DateRated asc
+
+/*Step 5 select distinct movies from hold-out sample and second last movie
+7254*/
+SELECT DISTINCT * 
+INTO #005UniqueMovies
+FROM 
+(SELECT DISTINCT
+movieID
+FROM
+#004SecondLastRatedMovies
+
+UNION ALL
+
+SELECT DISTINCT
+movieID
+FROM
+#002HoldOutSample) a
+
+/*Step 6 Select ratings from main sample only containing unique movies. Random
+sample of 2 000 000 ratings*/
+DROP TABLE DB_MArked.dbo.RatingsRandomSample
+DROP TABLE DB_MArked.dbo.RatingsRandomSubSample
+
+SELECT
+DISTINCT
+a.*
+INTO DB_MArked.dbo.RatingsRandomSample
+FROM 
+#003MainSample a
+INNER JOIN 
+(SELECT *
+FROM  #003MainSample WHERE 
+MovieID in (SELECT DISTINCT
+movieID
+FROM
+ #004SecondLastRatedMovies)) b
+ON 
+a.UserId = b.UserId AND
+a.MovieId = b.MovieId AND
+a.Rating = b.Rating AND
+a.DateRated = b.DateRated
+inner JOIN 
+(SELECT *
+FROM  #003MainSample WHERE 
+MovieID in (SELECT DISTINCT
+movieID
+FROM
+#002HoldOutSample)) c
+ON 
+B.UserId = c.UserId 
+
+
+SELECT TOP 2000000
+*
+INTO DB_MArked.dbo.RatingsRandomSubSample
+FROM DB_MArked.dbo.RatingsRandomSample
+ORDER BY NEWID()
+
+/*Run Python MoviesSimilarities*/
+
+/*Step 7 Generate comparison file to use for comparing recommendations and similarity matrix*/
+DROP TABLE DB_MArked.dbo.RatingComparisonTable
+
+SELECT 
+a.userId ,
+a.DateRated,
+a.movieId AS LastMovieId,
+b.movieID AS HoldOutMovieId,
+CASE WHEN a.movieId < b.movieId THEN a.movieID ELSE b.movieId END AS MinMovieID,
+CASE WHEN a.movieId < b.movieId THEN b.movieID ELSE a.movieId END AS MaxMovieID,
+a.Rating AS FirstRating,
+b.Rating AS HoldOutRating
+INTO DB_MArked.dbo.RatingComparisonTable
+FROM #004SecondLastRatedMovies a
+LEFT JOIN 
+#002HoldOutSample b
+ON
+a.UserId = b.UserId
+
+/*Step 8 Provide Recommendations and measure error*/
+SELECT 
+a.*,
+COALESCE(b.CosSim, c.CosSim) AS CosSim,
+COALESCE(b.n, c.n) AS n,
+CASE WHEN LastMovieId = b.MovieId1 OR LastMovieId =c.MovieId1 THEN COALESCE(b.RatingDiff,c.RatingDiff) ELSE COALESCE(b.RatingDiff*-1,c.RatingDiff*-1) END AS RatingDiff,
+CASE WHEN (FirstRating+CASE WHEN LastMovieId = b.MovieId1 OR LastMovieId =c.MovieId1 THEN COALESCE(b.RatingDiff,c.RatingDiff) ELSE COALESCE(b.RatingDiff*-1,c.RatingDiff*-1) END) > 5 THEN
+5 ELSE CASE WHEN (FirstRating+CASE WHEN LastMovieId = b.MovieId1 OR LastMovieId =c.MovieId1 THEN COALESCE(b.RatingDiff,c.RatingDiff) ELSE COALESCE(b.RatingDiff*-1,c.RatingDiff*-1) END)< 0.5 THEN 
+0.5 ELSE (FirstRating+CASE WHEN LastMovieId = b.MovieId1 OR LastMovieId =c.MovieId1 THEN COALESCE(b.RatingDiff,c.RatingDiff) ELSE COALESCE(b.RatingDiff*-1,c.RatingDiff*-1) END)
+END END
+AS RecommendedRating
+FROM DB_MArked.dbo.RatingComparisonTable a
+LEFT JOIN DB_Marked.dbo.similaritiesEvaluation15 b
+ON
+a.MinMovieId = b.MovieId1 AND
+a.MaxMovieId = b.MovieId2
+LEFT JOIN DB_Marked.dbo.similaritiesEvaluation15 c
+ON
+a.MinMovieId = c.MovieId2 AND
+a.MaxMovieId = c.MovieId1
+WHERE 
+COALESCE(b.CosSim, c.CosSim) IS NOT NULL 
+ORDER BY
+COALESCE(b.CosSim, c.CosSim)
