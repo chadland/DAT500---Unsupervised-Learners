@@ -17,12 +17,13 @@ This module calculates similarities between movies using cosine similarity
 2b) Calculate cosine similarities of all pairs
 
 3a) Emits item x and similarity measusre as key and other movies and number of coratings as value
-3b) Emits CSV item x, item y, cosine sim and number of co ratings. in CSV file
+3b) Emitsitem x, item y, cosine sim and number of co ratings. in CSV file
 
 '''
 __author__ = 'Unsupervised Learners'
 
 from mrjob.job import MRJob
+
 import math
 try:
     from itertools import combinations
@@ -33,6 +34,21 @@ PRIOR_COUNT = 10
 PRIOR_CORRELATION = 0
 
 class MoviesSimilarities(MRJob):
+    
+    ##If one would only like to compare one movie with other movies 
+    def configure_options(self):
+        super(MoviesSimilarities, self).configure_options()
+        
+        #Movie id comparison parameter
+        self.add_passthrough_option('--movieId-to-compare',dest='movieid_to_compare', type='int', default=0, help='Select the movieId to compare, if 0 inputed it compares all movies')
+        
+        #Minimum coratingsparameter        
+        self.add_passthrough_option('--minimum-nr-of-coratings',dest='min_co_ratings', type='int', default=30, help='Select the minimum number of coratings a movie-pair needs in order to be recommended')
+        
+        #self.add_file_option('--keyword-file',
+         #                    default='moviesToCompare.csv',
+         #                    dest="csv_Movies_To_Compare",
+         #                    help='path to list of keywords')    
 
     def steps(self):
         return [self.mr(self.group_by_user_rating,
@@ -63,7 +79,8 @@ class MoviesSimilarities(MRJob):
         ratingCount=1 
         
         #Outut userId, movieId, rating, ratings_count 
-        yield  int(userId), (int(movieId), float(rating), int(ratingCount))
+        if not any(c.isalpha() for c in userId):
+            yield  int(userId), (int(movieId), float(rating), int(ratingCount))
 
     def count_ratings_users_freq(self, userId, values):
         """
@@ -79,6 +96,7 @@ class MoviesSimilarities(MRJob):
         movieCount = 0
         movieSum = 0
         final = []
+        
         for movieId, rating, ratingCount in values:
             movieCount += 1
             movieSum += rating
@@ -103,9 +121,16 @@ class MoviesSimilarities(MRJob):
         movieCount, movieSum, ratings = values
         #print item_count, item_sum, [r for r in combinations(ratings, 2)]
         #bottleneck at combinations
-        for item1, item2 in combinations(ratings, 2):
-            yield (item1[0], item2[0]), \
-                    (item1[1], item2[1], item1[2], item2[2])
+        movieIdToCompare = self.options.movieid_to_compare 
+
+        if movieIdToCompare<>0:      
+            for item1, item2 in filter(lambda x: ((x[0][0]==movieIdToCompare) or (x[1][0]==movieIdToCompare))  , list(combinations(ratings,2))) :
+                yield (item1[0], item2[0]), \
+                        (item1[1], item2[1], item1[2], item2[2])              
+        else:     
+            for item1, item2 in combinations(ratings,2) :
+                yield (item1[0], item2[0]), \
+                        (item1[1], item2[1], item1[2], item2[2])
         
     def calculate_similarity(self, moviePairKey, lines):
         '''
@@ -121,7 +146,6 @@ class MoviesSimilarities(MRJob):
         70,21   0.1,1
         '''
         sum_xx, sum_xy, sum_yy, sum_x, sum_y, n = (0.0, 0.0, 0.0, 0.0, 0.0, 0)
-        n_x, n_y = 0, 0
         item_pair, co_ratings = moviePairKey, lines
         item_xname, item_yname = item_pair
         for item_x, item_y, nx_count, ny_count in lines:
@@ -131,14 +155,14 @@ class MoviesSimilarities(MRJob):
             sum_y += item_y
             sum_x += item_x
             n += 1
-            n_x = int(ny_count)
-            n_y = int(nx_count)
 
         #TODO, calculate other similarity measures
         cos_sim = sum_xy/math.sqrt(sum_xx*sum_yy)
+        corr_sim = ((sum_xy) - (sum_x*sum_y)/n) / math.sqrt((sum_xx-((sum_x^2)/n))*(sum_yy-((sum_y^2)/n)))
+        rating_diff = (sum_y-sum_x)/n 
         
         #Output movie x and movie y 
-        yield (item_xname, item_yname), (cos_sim, n)
+        yield (item_xname, item_yname), (cos_sim, corr_sim, rating_diff, n)
         
     def calculate_ranking(self, moviePairKey, values):
         '''
@@ -149,11 +173,13 @@ class MoviesSimilarities(MRJob):
         21,0.9    70,1
         70,0.4    19,1
         70,0.9    21,1
-        '''
-        cos_sim, n = values
+        '''        
+        cos_sim, corr_sim, rating_diff, n = values
         item_x, item_y = moviePairKey
-        if int(n) > 0:
-            yield (item_x, cos_sim), (item_y, n)
+        
+        #Emits only movies that has a minimum value of coratings above min_co_ratings
+        if int(n) >= self.options.min_co_ratings:
+            yield (item_x, cos_sim,corr_sim, rating_diff), (item_y, n)
 
     def top_similar_items(self, movieSim, similar_ns):
         '''
@@ -161,8 +187,11 @@ class MoviesSimilarities(MRJob):
         1;2;0.6;1
         1;4;0.4;2
         '''
-        item_x, cos_sim = movieSim
+        item_x, cos_sim, corr_sim, rating_diff = movieSim
         for item_y, n in similar_ns:
-            yield '%d;%d;%f;%d;' % (item_x, item_y, cos_sim, n), None
+            yield '%d;%d;%f;%f;%f;%d;' % (item_x, item_y, cos_sim, corr_sim, rating_diff, n), None
+            
 if __name__ == '__main__':
     MoviesSimilarities.run()
+    
+    
