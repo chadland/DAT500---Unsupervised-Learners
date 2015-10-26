@@ -96,17 +96,27 @@ class MoviesSimilarities(MRJob):
         87    2,3,(19,1 21,2)
         98    1,2,(19,2)
         """
+        movieIdToCompare = self.options.movieid_to_compare         
+        
         movieCount = 0
         movieSum = 0
         final = []
+        hasSeenMovieIdtoCompare=False
         
         for movieId, rating, ratingCount in values:
             movieCount += 1
             movieSum += rating
+            if movieIdToCompare <> 0:
+                if movieId == movieIdToCompare:
+                    hasSeenMovieIdtoCompare=True
             final.append((movieId, rating, ratingCount))
 
-
-        yield userId, (movieCount, movieSum, final)
+        #Only yield output if user has seen a specific movie
+        if movieId <> 0: 
+            if hasSeenMovieIdtoCompare:
+                yield userId, (movieCount, movieSum, final)
+        else:
+            yield userId, (movieCount, movieSum, final)
         
     def pairwise_items(self, userId, values):
         '''
@@ -128,15 +138,18 @@ class MoviesSimilarities(MRJob):
         movieIdToCompare = self.options.movieid_to_compare 
         normalize = self.options.normalize
 
-        if movieIdToCompare<>0:      
-            for item1, item2 in filter(lambda x: ((x[0][0]==movieIdToCompare) or (x[1][0]==movieIdToCompare))  , list(combinations(ratings,2))) :
-                if normalize <> 0:
-                    yield (item1[0], item2[0]), \
-                            (item1[1]-(movieSum/movieCount), item2[1]-(movieSum/movieCount), item1[2], item2[2])     
-                else:
-                    yield (item1[0], item2[0]), \
-                            (item1[1], item2[1], item1[2], item2[2])     
-                    
+        if movieIdToCompare<>0:   
+            #Set combiner
+            combinerIterator=combinations(ratings,2)
+            for item1, item2 in combinerIterator: #filter(lambda x: ((x[0][0]==movieIdToCompare) or (x[1][0]==movieIdToCompare))  , list(combinations(ratings,2))) :
+                if item1[0]==movieIdToCompare or item2[0]==movieIdToCompare:
+                    if normalize <> 0:
+                        yield (item1[0], item2[0]), \
+                                (item1[1]-(movieSum/movieCount), item2[1]-(movieSum/movieCount), item1[2], item2[2])     
+                    else:
+                        yield (item1[0], item2[0]), \
+                                (item1[1], item2[1], item1[2], item2[2])     
+                        
         else:     
             for item1, item2 in combinations(ratings,2) :
                 if normalize <> 0:
@@ -152,6 +165,7 @@ class MoviesSimilarities(MRJob):
         item x and item y, then calculate cosine similarity and
         counts.  The similarities are normalized to the [0,1] scale
         because we do a numerical sort.
+        
         19,21   0.4,2
         21,19   0.4,2
         19,70   0.6,1
@@ -173,18 +187,18 @@ class MoviesSimilarities(MRJob):
         if int(n) >= self.options.min_co_ratings:
             #TODO, calculate other similarity measures
             cos_sim = sum_xy/math.sqrt(sum_xx*sum_yy)
-            #if n > 0:
-            #    if math.sqrt((sum_xx-((math.pow(sum_x,2))/n))*(sum_yy-((math.pow(sum_y,2))/n)))<>0:
-            #        corr_sim = ((sum_xy) - (sum_x*sum_y)/n) / math.sqrt((sum_xx-((math.pow(sum_x,2))/n))*(sum_yy-((math.pow(sum_y,2))/n)))
-            #    else:
-            #        corr_sim=0
-            #else:
-            #     corr_sim=0
+            if n > 0:
+                if math.sqrt((sum_xx-((math.pow(sum_x,2))/n))*(sum_yy-((math.pow(sum_y,2))/n)))<>0:
+                    corr_sim = ((sum_xy) - (sum_x*sum_y)/n) / math.sqrt((sum_xx-((math.pow(sum_x,2))/n))*(sum_yy-((math.pow(sum_y,2))/n)))
+                else:
+                    corr_sim=0
+            else:
+                 corr_sim=0
                  
             rating_diff = (sum_y-sum_x)/n 
             
             #Output movie x and movie y 
-            yield (item_xname, item_yname), (cos_sim, 0, rating_diff, n)
+            yield (item_xname, item_yname), (cos_sim, corr_sim, rating_diff, n)
         
     def calculate_ranking(self, moviePairKey, values):
         '''
@@ -214,5 +228,10 @@ class MoviesSimilarities(MRJob):
             
 if __name__ == '__main__':
     MoviesSimilarities.run()
+    
+    
+#Ho to filter combinations
+    
+
     
     
